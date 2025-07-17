@@ -13,7 +13,7 @@ if [ ! -d "$LOCAL_MODEL_DIR" ] || [ -z "$(ls -A "$LOCAL_MODEL_DIR")" ]; then
   echo "Downloading model $HF_MODEL_ID into $LOCAL_MODEL_DIR..."
   python3 -c "
 from huggingface_hub import snapshot_download
-snapshot_download(repo_id='$HF_MODEL_ID', local_dir='$LOCAL_MODEL_DIR', local_dir_use_symlinks=False)
+snapshot_download(repo_id='$HF_MODEL_ID', local_dir='$LOCAL_MODEL_DIR')
 "
 else
   echo "Model already exists locally. Skipping download."
