@@ -16,7 +16,7 @@ BASE_MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 BASE_MODEL_NAME = "TinyLlama-1.1B-Chat-v1.0"
 MERGED_MODEL_NAME = BASE_MODEL_NAME + "-finetuned"
 ADAPTER_OUTPUT_DIR = "./adapter_weights"
-LOG_MERGED_MODEL = True
+LOG_MERGED_MODEL = False
 
 client = MlflowClient()
 
