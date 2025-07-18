@@ -1,6 +1,3 @@
-import random
-import string
-
 import mlflow
 from datasets import load_dataset
 from mlflow import MlflowClient
@@ -15,18 +12,15 @@ from transformers import (
     pipeline,
 )
 
-# Constants
 BASE_MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 BASE_MODEL_NAME = "TinyLlama-1.1B-Chat-v1.0"
-MERGED_MODEL_NAME = BASE_MODEL_NAME + "-finetune"
+MERGED_MODEL_NAME = BASE_MODEL_NAME + "-finetuned"
 ADAPTER_OUTPUT_DIR = "./adapter_weights"
 LOG_MERGED_MODEL = True
 
 client = MlflowClient()
 
-
-def random_string() -> str:
-    return ''.join(random.choice(string.ascii_letters) for _ in range(5))
+mlflow.set_experiment("TinyLlama-fine-tuning")
 
 
 def is_model_registered(model_name: str) -> bool:
@@ -44,12 +38,14 @@ def tokenize(example):
 
 
 # Step 1: Retrieve the base model and tokenizer
+
 base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID)
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID)
+print("Downloaded base model and tokenizer")
 
 if not is_model_registered(BASE_MODEL_NAME):
     print(f"Registering {BASE_MODEL_ID}...")
-    mlflow.set_experiment(BASE_MODEL_NAME + "-" + random_string())
+
     with mlflow.start_run(run_name="log-base-model") as base_run:
         model_info = mlflow.transformers.log_model(
             transformers_model=pipeline("text-generation", model=base_model, tokenizer=tokenizer),
@@ -58,10 +54,11 @@ if not is_model_registered(BASE_MODEL_NAME):
             input_example="What's the capital of France?"
         )
         mlflow.register_model(model_info.model_uri, BASE_MODEL_NAME)
-        print("Registered base model.")
+        print(f"Registered base model: {BASE_MODEL_NAME}")
 
 
 # Step 2: Apply LoRA adapter
+
 lora_config = LoraConfig(
     r=8,
     lora_alpha=16,
@@ -70,11 +67,14 @@ lora_config = LoraConfig(
     task_type="CAUSAL_LM",
     target_modules=["q_proj", "v_proj"]
 )
+
 model = get_peft_model(base_model, lora_config)
-print("LoRA adapter applied.")
+
+print("LoRA adapter applied")
 
 
 # Step 3: Prepare dataset and trainer
+
 dataset = load_dataset("Abirate/english_quotes")['train'].train_test_split(test_size=0.1)
 tokenized = dataset.map(tokenize)
 data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
@@ -99,11 +99,12 @@ trainer = Trainer(
     tokenizer=tokenizer,
     data_collator=data_collator,
 )
-print("Prepared dataset and trainer.")
+
+print("Prepared dataset and trainer")
 
 
 # Step 4: Fine-tuning
-mlflow.set_experiment(MERGED_MODEL_NAME + "-" + random_string())
+
 with mlflow.start_run(run_name="adapter-finetune") as run:
     mlflow.log_params({
         "registered_base_model": BASE_MODEL_ID,
@@ -117,6 +118,7 @@ with mlflow.start_run(run_name="adapter-finetune") as run:
     # Log adapter weights only
     model.save_pretrained(ADAPTER_OUTPUT_DIR)
     mlflow.log_artifacts(ADAPTER_OUTPUT_DIR, artifact_path="adapters")
+    print("Logged adapter weights")
 
     # Optionally merge and register final model
     if LOG_MERGED_MODEL:
@@ -128,4 +130,4 @@ with mlflow.start_run(run_name="adapter-finetune") as run:
             input_example="What's the capital of France?"
         )
         mlflow.register_model(merged_info.model_uri, MERGED_MODEL_NAME)
-        print(f"Merged model registered: {MERGED_MODEL_NAME}.")
+        print(f"Registered merged model: {MERGED_MODEL_NAME}")
