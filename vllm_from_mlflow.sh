@@ -30,8 +30,14 @@ LOCAL_MODEL_DIR=$(python3 - <<EOF
 from mlflow.store.artifact.models_artifact_repo import ModelsArtifactRepository
 
 model_uri = f"models:/${MODEL_NAME}/${MODEL_VERSION}"
-local_path = ModelsArtifactRepository(model_uri).download_artifacts("")
-print(local_path)
+download_dir = ModelsArtifactRepository(model_uri).download_artifacts("")
+
+# Look for the actual model subdirectory
+model_dir = os.path.join(download_dir, "model")
+if os.path.exists(os.path.join(model_dir, "config.json")):
+    print(model_dir)
+else:
+    raise RuntimeError("Hugging Face config.json not found under model subdirectory")
 EOF
 )
 
