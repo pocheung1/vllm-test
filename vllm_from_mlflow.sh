@@ -27,9 +27,10 @@ EOF
 echo "Downloading model from MLflow..."
 
 LOCAL_MODEL_DIR=$(python3 - <<EOF
-import mlflow
+from mlflow.store.artifact.models_artifact_repo import ModelsArtifactRepository
+
 model_uri = f"models:/${MODEL_NAME}/${MODEL_VERSION}"
-local_path = mlflow.artifacts.download_artifacts(model_uri=model_uri)
+local_path = ModelsArtifactRepository(model_uri).download_artifacts("")
 print(local_path)
 EOF
 )
