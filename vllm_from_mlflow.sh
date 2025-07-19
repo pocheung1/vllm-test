@@ -24,30 +24,39 @@ except Exception:
     sys.exit(1)
 EOF
 
-echo "Downloading model from MLflow..."
+echo "Downloading model from MLflow and preparing vLLM directory..."
 
-LOCAL_MODEL_DIR=$(python3 - <<EOF
+VLLM_MODEL_DIR=$(python3 - <<EOF
 from mlflow.store.artifact.models_artifact_repo import ModelsArtifactRepository
+from pathlib import Path
+import shutil
 import os
 
 model_uri = f"models:/${MODEL_NAME}/${MODEL_VERSION}"
-download_dir = ModelsArtifactRepository(model_uri).download_artifacts("")
+download_path = Path(ModelsArtifactRepository(model_uri).download_artifacts(""))
+output_path = Path("/tmp/vllm_model")
+output_path.mkdir(parents=True, exist_ok=True)
 
-# Look for the actual model subdirectory
-model_dir = os.path.join(download_dir, "model")
-if os.path.exists(os.path.join(model_dir, "config.json")):
-    print(model_dir)
-else:
-    raise RuntimeError("Hugging Face config.json not found under model subdirectory")
+model_dir = download_path / "model"
+tokenizer_dir = download_path / "components" / "tokenizer"
+
+if not (model_dir / "config.json").exists():
+    raise RuntimeError("config.json not found under model/")
+if not (tokenizer_dir / "tokenizer.model").exists():
+    raise RuntimeError("tokenizer.model not found under components/tokenizer/")
+
+shutil.copytree(model_dir, output_path, dirs_exist_ok=True)
+shutil.copytree(tokenizer_dir, output_path, dirs_exist_ok=True)
+
+print(output_path)
 EOF
 )
 
-echo "Model downloaded to $LOCAL_MODEL_DIR"
-
+echo "Model prepared at $VLLM_MODEL_DIR"
 echo "Starting vLLM server..."
 
 python3 -m vllm.entrypoints.openai.api_server \
-  --model "$LOCAL_MODEL_DIR" \
+  --model "$VLLM_MODEL_DIR" \
   --dtype float16 \
   --gpu-memory-utilization 0.9 \
   --host 0.0.0.0 \
